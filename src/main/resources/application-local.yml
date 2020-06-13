@@ -1,0 +1,11 @@
+spring:
+  kafka:
+    template:
+      default-topic: library-events
+    consumer:
+      bootstrap-servers: localhost:9092, localhost:9093, localhost:9094
+      #      we use LongSerializer, because LibraryEvent entity uses Long as key
+      key-serializer: org.apache.kafka.common.serialization.LongDeserializer
+      #      publishing the message into Kafka payload ( actual boyd ) is String
+      value-serializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: library-events-listener-group
