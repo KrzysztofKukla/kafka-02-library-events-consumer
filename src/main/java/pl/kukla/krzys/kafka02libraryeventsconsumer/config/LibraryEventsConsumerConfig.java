@@ -27,6 +27,12 @@ public class LibraryEventsConsumerConfig {
         //here we've changed default ActMode.BATCH ( default committing processed offsets ) to MANUAL
         // - we want to manually manage the offsets - commit offset on demand
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        //tree separate instance in 3 threads ( 3 separate KafkaListeners for the same application) - recommended only if we are running application
+        // NON  in cloud environment
+        //for Cloud or Kubernetes this option is not necessary
+        //each separate thread ( listener ) is going to read message from separate partition from topic ( we can see it on console logs )
+        factory.setConcurrency(3);
         return factory;
     }
 
