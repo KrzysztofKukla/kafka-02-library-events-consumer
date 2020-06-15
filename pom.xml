@@ -11,7 +11,7 @@
 	<groupId>pl.kukla.krzys</groupId>
 	<artifactId>kafka-02-library-events-consumer</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>Library Events Kafka Consumer</name>
+	<name>kafka-02-library-events-consumer</name>
 	<description>Demo for Kafka Consumer</description>
 
 	<properties>
@@ -22,6 +22,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
