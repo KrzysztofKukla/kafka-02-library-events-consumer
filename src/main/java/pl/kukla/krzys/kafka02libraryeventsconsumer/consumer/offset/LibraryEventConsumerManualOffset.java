@@ -12,12 +12,12 @@ import org.springframework.stereotype.Service;
  */
 //@Service
 @Slf4j
-public class LibraryEventConsumerManualOffset implements AcknowledgingMessageListener<Long, String> {
+public class LibraryEventConsumerManualOffset{//} implements AcknowledgingMessageListener<Long, String> {
 
     public static final String TOPIC = "library-events";
 
-    @Override
-    @KafkaListener(topics = {TOPIC})
+//    @Override
+//    @KafkaListener(topics = {TOPIC})
     public void onMessage(ConsumerRecord<Long, String> consumerRecord, Acknowledgment acknowledgment) {
         log.info("Kafka listener read from {} topic and consumerRecord is: {}", consumerRecord.topic(), consumerRecord);
 
