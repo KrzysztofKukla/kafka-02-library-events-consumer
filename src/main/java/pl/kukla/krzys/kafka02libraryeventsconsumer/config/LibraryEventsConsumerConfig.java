@@ -1,5 +1,6 @@
 package pl.kukla.krzys.kafka02libraryeventsconsumer.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +16,7 @@ import org.springframework.kafka.listener.ContainerProperties;
 @Configuration
 //@EnableKafka allows to read all properties for Kafka defined in application.yml
 @EnableKafka
+@Slf4j
 public class LibraryEventsConsumerConfig {
 
     @Bean
@@ -33,6 +35,11 @@ public class LibraryEventsConsumerConfig {
         //for Cloud or Kubernetes this option is not necessary
         //each separate thread ( listener ) is going to read message from separate partition from topic ( we can see it on console logs )
         factory.setConcurrency(3);
+
+        //handle custom error to provide any special details information
+        factory.setErrorHandler(((thrownException, data) -> {
+            log.error("Exception in consumerConfig is {} and record is {}", thrownException.getMessage(), data);
+        }));
         return factory;
     }
 
