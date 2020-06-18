@@ -23,6 +23,7 @@ import pl.kukla.krzys.kafka02libraryeventsconsumer.domain.LibraryEventType;
 import pl.kukla.krzys.kafka02libraryeventsconsumer.repository.LibraryEventRepository;
 import pl.kukla.krzys.kafka02libraryeventsconsumer.service.LibraryEventService;
 
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +38,7 @@ public class LibraryEventConsumerIT {
 
     private static final String BOOK_AUTHOR = "any author";
     private static final String BOOK_NAME = "abcd";
-    private static final long BOOK_ID = 4L;
+    private static final Long BOOK_ID = null;
     private static final LibraryEventType LIBRARY_EVENT_TYPE = LibraryEventType.NEW;
 
     @Autowired
@@ -88,7 +89,8 @@ public class LibraryEventConsumerIT {
         kafkaTemplate.sendDefault(libraryEventJson).get();
 
         //consumer is going to run in different thread from actual application
-        //block until count reach zero
+        //block this Thread until count reach zero and in the meantime ( w miedzyczasie ) consumer will read the message from Kafka topic
+        // and process that
         CountDownLatch latch = new CountDownLatch(1);
         //wait max 3 sec
         latch.await(3, TimeUnit.SECONDS);
@@ -105,11 +107,62 @@ public class LibraryEventConsumerIT {
             () -> {
                 Book book = libraryEvent.getBook();
                 Assertions.assertNotNull(book);
-                Assertions.assertEquals(BOOK_ID, book.getId());
+                Assertions.assertNotNull(book.getId());
                 Assertions.assertEquals(BOOK_AUTHOR, book.getAuthor());
                 Assertions.assertEquals(BOOK_NAME, book.getName());
             }
         );
+    }
+
+    @Test
+    void updatePublishLibraryEvent() throws Exception {
+        LibraryEvent dummyLibraryEvent = createDummyLibraryEvent(createDummyBook());
+        LibraryEvent savedLibraryEvent = libraryEventRepository.save(dummyLibraryEvent);
+        Book savedBook = savedLibraryEvent.getBook();
+
+        String bookNameUpdated = "updated book name";
+        String bookAuthorUpdated = "updated author of book";
+        Book updatedBook = Book.builder()
+            .id(savedBook.getId())
+            .name(bookNameUpdated)
+            .author(bookAuthorUpdated)
+            .build();
+        savedLibraryEvent.setLibraryEventType(LibraryEventType.UPDATE);
+        savedLibraryEvent.setBook(updatedBook);
+        String libraryEventJson = objectMapper.writeValueAsString(savedLibraryEvent);
+
+        //send to default topic
+        //name of default topic is loaded from KafkaAutoConfiguration from application.yml
+        //asynchronous call
+        //get() method invoke this method synchronous
+        kafkaTemplate.sendDefault(savedLibraryEvent.getId(), libraryEventJson).get();
+
+        //consumer is going to run in different thread from actual application
+        //block this Thread until count reach zero and in the meantime ( w miedzyczasie ) consumer will read the message from Kafka topic
+        // and process that
+        CountDownLatch latch = new CountDownLatch(1);
+        //wait max 3 sec
+        latch.await(3, TimeUnit.SECONDS);
+
+        BDDMockito.then(libraryEventConsumerServiceSpy).should().onMessage(ArgumentMatchers.any(ConsumerRecord.class));
+        BDDMockito.then(libraryEventServiceSpy).should().processLibraryEventAndSave(ArgumentMatchers.any(ConsumerRecord.class));
+
+        Optional<LibraryEvent> libraryEventOptional = libraryEventRepository.findById(savedLibraryEvent.getId());
+        Assertions.assertTrue(libraryEventOptional.isPresent());
+        LibraryEvent libraryEventReadFromKafka = libraryEventOptional.get();
+        Assertions.assertAll(
+            () -> Assertions.assertEquals(savedLibraryEvent.getId(), libraryEventReadFromKafka.getId()),
+            () -> Assertions.assertEquals(LibraryEventType.UPDATE, libraryEventReadFromKafka.getLibraryEventType()),
+            () -> {
+                Book book = libraryEventReadFromKafka.getBook();
+                Assertions.assertNotNull(book);
+                Assertions.assertNotNull(book.getId());
+                Assertions.assertEquals(savedLibraryEvent.getBook().getId(), book.getId());
+                Assertions.assertEquals(bookNameUpdated, book.getName());
+                Assertions.assertEquals(bookAuthorUpdated, book.getAuthor());
+            }
+        );
+
     }
 
     private LibraryEvent createDummyLibraryEvent(Book book) {
