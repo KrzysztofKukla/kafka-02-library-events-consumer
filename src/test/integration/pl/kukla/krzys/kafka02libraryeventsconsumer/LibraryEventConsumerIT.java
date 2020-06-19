@@ -5,9 +5,11 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.BDDMockito;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
@@ -112,6 +114,30 @@ public class LibraryEventConsumerIT {
                 Assertions.assertEquals(BOOK_NAME, book.getName());
             }
         );
+    }
+
+    @DisplayName(value = "Retries 3 times regarding to retryPolicy defined in @Configuration")
+    @Test
+    void publishNewLibraryEventWithRuntimeException() throws Exception {
+        //if book is null then throw RuntimeException and consumer retries the reading message
+        LibraryEvent dummyLibraryEvent = createDummyLibraryEvent(null);
+        String libraryEventJson = objectMapper.writeValueAsString(dummyLibraryEvent);
+
+        //send to default topic
+        //name of default topic is loaded from KafkaAutoConfiguration from application.yml
+        //asynchronous call
+        //get() method invoke this method synchronous
+        kafkaTemplate.sendDefault(libraryEventJson).get();
+
+        //consumer is going to run in different thread from actual application
+        //block this Thread until count reach zero and in the meantime ( w miedzyczasie ) consumer will read the message from Kafka topic
+        // and process that
+        CountDownLatch latch = new CountDownLatch(1);
+        //wait max 3 sec
+        latch.await(3, TimeUnit.SECONDS);
+
+        BDDMockito.then(libraryEventConsumerServiceSpy).should(Mockito.times(3)).onMessage(ArgumentMatchers.any(ConsumerRecord.class));
+        BDDMockito.then(libraryEventServiceSpy).should(Mockito.times(3)).processLibraryEventAndSave(ArgumentMatchers.any(ConsumerRecord.class));
     }
 
     @Test
