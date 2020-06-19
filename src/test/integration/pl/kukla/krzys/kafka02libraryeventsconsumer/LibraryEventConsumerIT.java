@@ -116,11 +116,12 @@ public class LibraryEventConsumerIT {
         );
     }
 
-    @DisplayName(value = "Retries 3 times regarding to retryPolicy defined in @Configuration")
+    @DisplayName(value = "Retries 3 times regarding to retryPolicy for RecoverableDataAccessException defined in @Configuration")
     @Test
-    void publishNewLibraryEventWithRuntimeException() throws Exception {
+    void publishNewLibraryEventWith_RecoverableDataAccessExceptionCauses3Retries() throws Exception {
         //if book is null then throw RuntimeException and consumer retries the reading message
-        LibraryEvent dummyLibraryEvent = createDummyLibraryEvent(null);
+        LibraryEvent dummyLibraryEvent = createDummyLibraryEvent(createDummyBook());
+        dummyLibraryEvent.setId(0L);
         String libraryEventJson = objectMapper.writeValueAsString(dummyLibraryEvent);
 
         //send to default topic
@@ -138,6 +139,33 @@ public class LibraryEventConsumerIT {
 
         BDDMockito.then(libraryEventConsumerServiceSpy).should(Mockito.times(3)).onMessage(ArgumentMatchers.any(ConsumerRecord.class));
         BDDMockito.then(libraryEventServiceSpy).should(Mockito.times(3)).processLibraryEventAndSave(ArgumentMatchers.any(ConsumerRecord.class));
+    }
+
+    @DisplayName(value = "No retries to retryPolicy for IllegalArgumentException defined in @Configuration")
+    @Test
+    void publishNewLibraryEventWith_RuntimeExceptionNoRetries() throws Exception {
+        //if book is null then throw RuntimeException and consumer retries the reading message
+        LibraryEvent dummyLibraryEvent = createDummyLibraryEvent(createDummyBook());
+
+        //no retry for id=-1
+        dummyLibraryEvent.setId(-1L);
+        String libraryEventJson = objectMapper.writeValueAsString(dummyLibraryEvent);
+
+        //send to default topic
+        //name of default topic is loaded from KafkaAutoConfiguration from application.yml
+        //asynchronous call
+        //get() method invoke this method synchronous
+        kafkaTemplate.sendDefault(libraryEventJson).get();
+
+        //consumer is going to run in different thread from actual application
+        //block this Thread until count reach zero and in the meantime ( w miedzyczasie ) consumer will read the message from Kafka topic
+        // and process that
+        CountDownLatch latch = new CountDownLatch(1);
+        //wait max 3 sec
+        latch.await(3, TimeUnit.SECONDS);
+
+        BDDMockito.then(libraryEventConsumerServiceSpy).should(Mockito.times(1)).onMessage(ArgumentMatchers.any(ConsumerRecord.class));
+        BDDMockito.then(libraryEventServiceSpy).should(Mockito.times(1)).processLibraryEventAndSave(ArgumentMatchers.any(ConsumerRecord.class));
     }
 
     @Test

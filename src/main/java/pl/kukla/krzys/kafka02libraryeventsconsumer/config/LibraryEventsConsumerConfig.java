@@ -5,6 +5,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -14,6 +15,9 @@ import org.springframework.retry.backoff.BackOffPolicy;
 import org.springframework.retry.backoff.FixedBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Krzysztof Kukla
@@ -67,10 +71,12 @@ public class LibraryEventsConsumerConfig {
     }
 
     private RetryPolicy createRetryPolicy() {
-        SimpleRetryPolicy simpleRetryPolicy = new SimpleRetryPolicy();
+        Map<Class<? extends Throwable>, Boolean> exceptionsToRetry = new HashMap<>();
+        exceptionsToRetry.put(RecoverableDataAccessException.class, true); //this is added to retry
+        exceptionsToRetry.put(IllegalArgumentException.class, false); //this is excluded from retry
 
+        SimpleRetryPolicy simpleRetryPolicy = new SimpleRetryPolicy(3, exceptionsToRetry, true);
         //if any record is failed then is going to retries max attempts for each record
-        simpleRetryPolicy.setMaxAttempts(3);
         return simpleRetryPolicy;
     }
 
